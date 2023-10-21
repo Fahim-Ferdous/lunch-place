@@ -2,10 +2,11 @@ import enum
 
 from sqlalchemy import (VARCHAR, Boolean, Column, Enum, ForeignKey, Integer,
                         String)
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import DeclarativeBase, relationship
 
-from config import settings
-from database import Base
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Weekdays(enum.StrEnum):

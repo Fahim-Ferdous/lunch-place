@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -11,30 +10,27 @@ import auth
 import crud
 import models
 import schemas
-from config import settings
-from database import SessionLocal, engine
+from database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    # create root user.
-    crud.create_root_user(db=next(get_db()))
+async def lifespan(app: FastAPI):
+    # create root user on startup, if not exists.
+
+    # First check if get_db has been overriden, since we will override it during tests.
+    dependency = (
+        get_db
+        if get_db not in app.dependency_overrides
+        else app.dependency_overrides[get_db]
+    )
+    crud.create_root_user(next(dependency()))
     yield
 
 
 app = FastAPI(lifespan=lifespan)
 security = HTTPBearer()
-
-
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def admin_only(creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
@@ -47,6 +43,7 @@ def admin_only(creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
         )
 
 
+# TODO: Logout (use a nonce in jwt?)
 @app.post("/login", response_model=auth.Token)
 def login_access_token(
     db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()
@@ -58,15 +55,15 @@ def login_access_token(
             detail="Incorrect username or password",
         )
 
-    access_token_expires = timedelta(seconds=settings.JWT_TTL_SECONDS)
-    access_token = auth.create_access_token(
-        data={"role": user.role, "sub": user.username},
-        expires_delta=access_token_expires,
-    )
-    return {"access_token": access_token}
+    return auth.create_access_token(str(user.username), models.Roles(str(user.role)))
 
 
-@app.post("/users/", response_model=schemas.User, dependencies=[Depends(admin_only)])
+@app.post(
+    "/users/",
+    response_model=schemas.User,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(admin_only)],
+)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     u, e = crud.is_email_username_registered(
         db, username=user.username, email=user.email

@@ -1,19 +1,15 @@
-import secrets
-
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.functions import user
 
 import auth
 import models
 import schemas
 from config import settings
-from database import Base, engine
+from database import engine
+from models import Base
 
 
-def create_root_user(
-    db: Session, username: str | None = None, password: str | None = None
-) -> None:
+def create_root_user(db: Session) -> None:
     """
     Should run on startup. Check if there is at least one admin. If not, create one.
     """
@@ -22,22 +18,16 @@ def create_root_user(
 
     Base.metadata.create_all(engine)
 
-    if username is None:
-        username = "root"
-    if password is None:
-        # TODO: Validate password.
-        password = secrets.token_urlsafe(settings.PASSWORD_MAX_LENGTH)
-
-    hashed_password = auth.pwd_context.hash(password)
+    hashed_password = auth.pwd_context.hash(settings.ROOT_PASSWORD)
 
     db.add(
         models.User(
-            username=username, password=hashed_password, role=models.Roles.ADMIN
+            username=settings.ROOT_USERNAME,
+            password=hashed_password,
+            role=models.Roles.ADMIN,
         )
     )
     db.commit()
-
-    print(f"Admin credentials, {username}:{password}")
 
 
 def is_email_username_registered(
@@ -51,6 +41,7 @@ def is_email_username_registered(
 
     u = False
     e = False
+    # TODO: Migrate to sqlalchemy2 declarative models.
     for i in l:
         if i.username == username:
             u = True
@@ -60,7 +51,7 @@ def is_email_username_registered(
     return (u, e)
 
 
-def get_user(db: Session, username: str) -> models.User:
+def get_user(db: Session, username: str) -> models.User | None:
     return db.query(models.User).filter(models.User.username == username).first()
 
 

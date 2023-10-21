@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from config import settings
 from models import Roles
+from schemas import UserBase
 
 
 class Token(BaseModel):
@@ -29,7 +30,7 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def encode_jwt(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -40,6 +41,16 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
         to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
+
+
+def create_access_token(username: str, role: Roles) -> Token:
+    access_token_expires = timedelta(seconds=settings.JWT_TTL_SECONDS)
+    access_token = encode_jwt(
+        data={"role": role, "sub": username},
+        expires_delta=access_token_expires,
+    )
+
+    return Token(access_token=access_token)
 
 
 def unpack_jwt(token: str) -> TokenData:
