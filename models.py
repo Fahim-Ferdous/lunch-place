@@ -1,7 +1,6 @@
 import enum
 
-from sqlalchemy import (VARCHAR, Boolean, Column, Enum, ForeignKey, Integer,
-                        String)
+from sqlalchemy import VARCHAR, Column, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -51,7 +50,7 @@ class RestaurantMenu(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(VARCHAR(32))
-    day = Column(Enum(Weekdays))
+    day = Column(Enum(Weekdays), nullable=False)  # type: ignore
 
 
 class User(Base):
@@ -61,6 +60,6 @@ class User(Base):
     username = Column(VARCHAR(32), unique=True, nullable=False)
     password = Column(VARCHAR(60))
     email = Column(String, unique=True, index=True)
-    role = Column(Enum(Roles), nullable=False)
+    role = Column(Enum(Roles), nullable=False)  # type: ignore
 
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"))

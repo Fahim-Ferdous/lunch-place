@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from config import settings
 from models import Roles
-from schemas import UserBase
 
 
 class Token(BaseModel):
@@ -22,15 +21,17 @@ class TokenData(BaseModel):
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def encode_jwt(data: dict, expires_delta: timedelta | None = None) -> str:
+def encode_jwt(
+    data: dict[str, datetime | str], expires_delta: timedelta | None = None
+) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

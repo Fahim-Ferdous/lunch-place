@@ -6,7 +6,7 @@ import models
 import schemas
 from config import settings
 from database import engine
-from models import Base, User
+from models import Base
 
 
 def create_root_user(db: Session) -> None:
@@ -66,10 +66,6 @@ def create_restaurant(
     return r
 
 
-def get_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.User).offset(skip).limit(limit).all()
-
-
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     user_copy = user.model_copy()
     user_copy.password = auth.get_password_hash(user.password)
@@ -79,7 +75,3 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db.commit()
     db.refresh(db_user)
     return db_user
-
-
-def get_items(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Item).offset(skip).limit(limit).all()

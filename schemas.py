@@ -1,8 +1,7 @@
 from string import ascii_letters, digits
-from typing import Any
 
 from pydantic import (BaseModel, ConfigDict, EmailStr, Field, ValidationInfo,
-                      field_validator, validator)
+                      field_validator)
 
 from models import Roles
 
@@ -11,7 +10,7 @@ valid_username_chars = set(ascii_letters + digits + "-_")
 
 class RestaurantBase(BaseModel):
     name: str = Field(max_length=32)
-    description: str | None = Field(None, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
 
 
 class Restaurant(RestaurantBase):
@@ -47,14 +46,14 @@ class UserCreate(UserBase):
 
     @field_validator("restaurant_id")
     @classmethod
-    def validate_restaurant_id(cls, v: int | None, info: ValidationInfo):
+    def validate_restaurant_id(cls, v: int | None, info: ValidationInfo) -> int | None:
         if info.data["role"] == Roles.RESTAURATEUR and v is None:
             raise ValueError("restaurant_id is required for creating restaurateurs")
         return v
 
     @field_validator("username")
     @classmethod
-    def check_username(cls, v: str):
+    def check_username(cls, v: str) -> str:
         assert not any(
             i for i in v if i not in valid_username_chars
         ), "Username can only contain alphanumeric characters, underscores, ands hyphens"

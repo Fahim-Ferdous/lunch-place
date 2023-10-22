@@ -1,3 +1,5 @@
+import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -17,16 +19,16 @@ models.Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Creates root user on startup, if not exists.
-    First check if get_db has been overriden, since we will override it during tests.
+    We need to check if get_db has been overriden, since we will override it during tests.
     """
-    dependency = (
-        get_db
-        if get_db not in app.dependency_overrides
-        else app.dependency_overrides[get_db]
-    )
+    dependency = get_db
+    if get_db in app.dependency_overrides:
+        dependency = app.dependency_overrides[get_db]
+
+    logging.info("LIFESPAN")
     crud.create_root_user(next(dependency()))
     yield
 
@@ -35,7 +37,9 @@ app = FastAPI(lifespan=lifespan)
 security = HTTPBearer()
 
 
-def admin_only(creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+def admin_only(
+    creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+) -> None:
     d = auth.unpack_jwt(creds.credentials)
     if d.role != models.Roles.ADMIN:
         raise HTTPException(
@@ -49,7 +53,7 @@ def admin_only(creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
 @app.post("/login", response_model=auth.Token)
 def login_access_token(
     db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()
-):
+) -> auth.Token:
     user = crud.get_user(db, username=form_data.username)
     if user is None or not auth.verify_password(form_data.password, user.password):
         raise HTTPException(
@@ -66,7 +70,7 @@ def login_access_token(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(admin_only)],
 )
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)) -> models.User:
     u, e = crud.is_email_username_registered(
         db, username=user.username, email=user.email
     )
@@ -94,11 +98,5 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 )
 def create_restaurant(
     restaurant: schemas.RestaurantCreate, db: Session = Depends(get_db)
-):
+) -> models.Restaurant:
     return crud.create_restaurant(db, restaurant)
-
-
-@app.get("/items/", response_model=list[schemas.Item])
-def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    items = crud.get_items(db, skip=skip, limit=limit)
-    return items

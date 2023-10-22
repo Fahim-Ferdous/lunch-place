@@ -1,6 +1,12 @@
+import logging
+from collections.abc import Generator
+from sqlite3 import Connection as SqliteConnection
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.interfaces import DBAPIConnection
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from config import settings
 
@@ -11,14 +17,18 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, _):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+def set_sqlite_pragma(
+    dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry
+) -> None:
+    logging.info("FORGG")
+    if isinstance(dbapi_connection, SqliteConnection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 # Dependency function for db parameter to handler functions.
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
