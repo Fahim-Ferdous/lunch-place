@@ -1,0 +1,7 @@
+FROM bongo_app
+
+COPY tests tests 
+COPY pytest.ini .
+COPY sample.env .env
+
+CMD pytest
