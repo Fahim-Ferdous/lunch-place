@@ -15,4 +15,5 @@ jobs:
       - name: Install pip dependencies
         run: pip install -r requirements.txt
       - name: Testing
+        run: cp sample.env .env
         run: pytest
