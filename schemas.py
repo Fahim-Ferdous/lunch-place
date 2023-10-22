@@ -1,10 +1,25 @@
 from string import ascii_letters, digits
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (BaseModel, ConfigDict, EmailStr, Field, ValidationInfo,
+                      field_validator, validator)
 
 from models import Roles
 
 valid_username_chars = set(ascii_letters + digits + "-_")
+
+
+class RestaurantBase(BaseModel):
+    name: str = Field(max_length=32)
+    description: str | None = Field(None, max_length=255)
+
+
+class Restaurant(RestaurantBase):
+    id: int
+
+
+class RestaurantCreate(RestaurantBase):
+    pass
 
 
 class Item(BaseModel):
@@ -14,8 +29,6 @@ class Item(BaseModel):
     name: str = Field(max_length=32)
     price: int = Field(gt=0, lt=10e5)
     description: str | None = Field(max_length=255)
-
-    hide: bool = Field(False)
 
 
 class UserBase(BaseModel):
@@ -30,6 +43,14 @@ class UserCreate(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
     password: str
+    restaurant_id: int | None = None
+
+    @field_validator("restaurant_id")
+    @classmethod
+    def validate_restaurant_id(cls, v: int | None, info: ValidationInfo):
+        if info.data["role"] == Roles.RESTAURATEUR and v is None:
+            raise ValueError("restaurant_id is required for creating restaurateurs")
+        return v
 
     @field_validator("username")
     @classmethod
@@ -38,9 +59,3 @@ class UserCreate(UserBase):
             i for i in v if i not in valid_username_chars
         ), "Username can only contain alphanumeric characters, underscores, ands hyphens"
         return v
-
-
-class User(UserBase):
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
-    id: int

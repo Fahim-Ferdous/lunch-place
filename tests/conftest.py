@@ -1,4 +1,4 @@
-from typing import Generator, final
+from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,7 +35,7 @@ def admin_auth_token() -> Generator:
     yield create_access_token(settings.ROOT_USERNAME, Roles.ADMIN).access_token
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite://"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.sqlite"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -44,28 +44,47 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 
 Base.metadata.create_all(bind=engine)
 
 
 def create_dummy_data():
+    users = [
+        schemas.UserCreate(
+            username="employee1",
+            role=Roles.EMPLOYEE,
+            email="employee1@email.com",
+            password="pass1",
+        ),
+        schemas.UserCreate(
+            username="restaurateur1",
+            role=Roles.RESTAURATEUR,
+            email="restaurateur1@email.com",
+            password="pass1",
+            restaurant_id=1,
+        ),
+    ]
+
+    restaurants = [schemas.RestaurantCreate(name="restaurant1")]
+
     test_db = TestingSessionLocal()
     try:
-        for u in [
-            schemas.UserCreate(
-                username="employee1",
-                role=Roles.EMPLOYEE,
-                email="employee1@email.com",
-                password="pass1",
-            ),
-            schemas.UserCreate(
-                username="restaurateur1",
-                role=Roles.RESTAURATEUR,
-                email="restaurateur1@email.com",
-                password="pass1",
-            ),
-        ]:
+        for u in users:
             test_db.add(models.User(**u.model_dump()))
+
+        for r in restaurants:
+            test_db.add(models.Restaurant(**r.model_dump()))
+
         test_db.commit()
     finally:
         test_db.close()

@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,
                               OAuth2PasswordRequestForm)
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import auth
@@ -17,9 +18,10 @@ models.Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # create root user on startup, if not exists.
-
-    # First check if get_db has been overriden, since we will override it during tests.
+    """
+    Creates root user on startup, if not exists.
+    First check if get_db has been overriden, since we will override it during tests.
+    """
     dependency = (
         get_db
         if get_db not in app.dependency_overrides
@@ -60,7 +62,7 @@ def login_access_token(
 
 @app.post(
     "/users/",
-    response_model=schemas.User,
+    response_model=schemas.UserBase,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(admin_only)],
 )
@@ -77,13 +79,23 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=409, detail=f"{' and '.join(d)} already registered"
         )
-    return crud.create_user(db=db, user=user)
+    try:
+        new_user = crud.create_user(db=db, user=user)
+        return new_user
+    except IntegrityError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Restaurant does not exist.")
 
 
-@app.get("/users/", response_model=list[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    users = crud.get_users(db, skip=skip, limit=limit)
-    return users
+@app.post(
+    "/restaurants/",
+    response_model=schemas.Restaurant,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(admin_only)],
+)
+def create_restaurant(
+    restaurant: schemas.RestaurantCreate, db: Session = Depends(get_db)
+):
+    return crud.create_restaurant(db, restaurant)
 
 
 @app.get("/items/", response_model=list[schemas.Item])

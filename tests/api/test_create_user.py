@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from auth import Token
 
 
-def test_create_user(client: TestClient, admin_auth_token: Token):
+def test_create_user(client: TestClient, admin_auth_token: str):
     r = client.post(
         "/users",
         json={
@@ -19,7 +19,25 @@ def test_create_user(client: TestClient, admin_auth_token: Token):
     assert r.status_code == 201
 
 
-def test_non_admin_cant_create_user(client: TestClient, employee_auth_token: Token):
+def test_create_restaurateur_requires_restaurant(
+    client: TestClient, admin_auth_token: str
+):
+    r = client.post(
+        "/users",
+        json={
+            "username": "newrestaurateur2",
+            "password": "hello123",
+            "role": "restaurateur",
+            "email": "email3@email.com",
+            "restaurant_id": 0xDEAD,
+        },
+        headers={"Authorization": f"Bearer {admin_auth_token}"},
+    )
+
+    assert r.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_non_admin_cant_create_user(client: TestClient, employee_auth_token: str):
     r = client.post(
         "/users",
         json={
@@ -34,7 +52,7 @@ def test_non_admin_cant_create_user(client: TestClient, employee_auth_token: Tok
     assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
-def test_username_email_conflicts(client: TestClient, admin_auth_token: Token):
+def test_username_email_conflicts(client: TestClient, admin_auth_token: str):
     for u, v in [
         (
             {

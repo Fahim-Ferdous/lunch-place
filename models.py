@@ -29,6 +29,9 @@ class Restaurant(Base):
     __tablename__ = "restaurants"
 
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(VARCHAR(32), unique=True, nullable=False)
+    description = Column(VARCHAR(255))
+
     items = relationship("Item")
 
 
@@ -36,13 +39,11 @@ class Item(Base):
     __tablename__ = "items"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(VARCHAR(), unique=True, nullable=False)
+    name = Column(VARCHAR(32), unique=True, nullable=False)
     price = Column(Integer, nullable=False)
     description = Column(VARCHAR(255))
 
-    hide = Column(Boolean, nullable=False, default=False)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
-    # restaurant = relationship("Restaurant", back_populates="restaurants")
 
 
 class RestaurantMenu(Base):
@@ -51,7 +52,6 @@ class RestaurantMenu(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(VARCHAR(32))
     day = Column(Enum(Weekdays))
-    hide = Column(Boolean, nullable=False, default=False)
 
 
 class User(Base):
@@ -61,4 +61,6 @@ class User(Base):
     username = Column(VARCHAR(32), unique=True, nullable=False)
     password = Column(VARCHAR(60))
     email = Column(String, unique=True, index=True)
-    role = Column(Enum(Roles), nullable=False, default=Roles.EMPLOYEE)
+    role = Column(Enum(Roles), nullable=False)
+
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
