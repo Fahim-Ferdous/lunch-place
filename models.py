@@ -1,7 +1,8 @@
 import enum
+from typing import Optional
 
-from sqlalchemy import VARCHAR, Column, Enum, ForeignKey, Integer, String
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy import VARCHAR, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -24,42 +25,42 @@ class Roles(enum.StrEnum):
     RESTAURATEUR = enum.auto()
 
 
-class Restaurant(Base):
-    __tablename__ = "restaurants"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(VARCHAR(32), unique=True, nullable=False)
-    description = Column(VARCHAR(255))
-
-    items = relationship("Item")
-
-
 class Item(Base):
     __tablename__ = "items"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(VARCHAR(32), unique=True, nullable=False)
-    price = Column(Integer, nullable=False)
-    description = Column(VARCHAR(255))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(VARCHAR(32), unique=True, nullable=False)
+    price: Mapped[int]
+    description: Mapped[str | None] = mapped_column(VARCHAR(255))
 
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = mapped_column(ForeignKey("restaurants.id"))
+
+
+class Restaurant(Base):
+    __tablename__ = "restaurants"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(VARCHAR(32), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(VARCHAR(255))
+
+    items = relationship(Item)
 
 
 class RestaurantMenu(Base):
     __tablename__ = "restaurant_menus"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(VARCHAR(32))
-    day = Column(Enum(Weekdays), nullable=False)  # type: ignore
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    title: Mapped[str | None] = mapped_column(VARCHAR(32))
+    day: Mapped[Weekdays]
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(VARCHAR(32), unique=True, nullable=False)
-    password = Column(VARCHAR(60))
-    email = Column(String, unique=True, index=True)
-    role = Column(Enum(Roles), nullable=False)  # type: ignore
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(VARCHAR(32), unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(VARCHAR(60))
+    email: Mapped[str] = mapped_column(unique=True)
+    role: Mapped[Roles]
 
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = mapped_column(ForeignKey("restaurants.id"))

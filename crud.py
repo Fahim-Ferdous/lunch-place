@@ -24,6 +24,7 @@ def create_root_user(db: Session) -> None:
         models.User(
             username=settings.ROOT_USERNAME,
             password=hashed_password,
+            email=settings.ROOT_EMAIL,
             role=models.Roles.ADMIN,
         )
     )
@@ -41,7 +42,6 @@ def is_email_username_registered(
 
     u = False
     e = False
-    # TODO: Migrate to sqlalchemy2 declarative models.
     for i in l:
         if i.username == username:
             u = True
