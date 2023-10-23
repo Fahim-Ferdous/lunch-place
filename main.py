@@ -1,4 +1,3 @@
-import logging
 from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -28,7 +27,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if get_db in app.dependency_overrides:
         dependency = app.dependency_overrides[get_db]
 
-    logging.info("LIFESPAN")
     crud.create_root_user(next(dependency()))
     yield
 
@@ -147,15 +145,29 @@ def get_menu(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(restaurateur_only)],
 )
-def add_to_daily_menu(
+def add_menu(
     items: list[schemas.ItemCreate],
     day: models.Weekdays | None = None,
     restaurant_id: int = Depends(get_restaurant_id),
     db: Session = Depends(get_db),
 ) -> models.DailyMenu | list[models.Item]:
-    return crud.add_items(
-        db,
-        restaurant_id,
-        day,
-        items,
-    )
+    return crud.add_items(db, restaurant_id, day, items)
+
+
+@app.patch(
+    "/menu/",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(restaurateur_only)],
+)
+def patch_menu(
+    patch: schemas.PatchMenu,
+    restaurant_id: int = Depends(get_restaurant_id),
+    db: Session = Depends(get_db),
+) -> None:
+    if patch.day is not None:
+        if patch.op == schemas.PatchMenuOp.ADD:
+            crud.add_item_to_daily_menu(db, restaurant_id, patch.day, patch.ids)
+        elif patch.op == schemas.PatchMenuOp.REMOVE:
+            crud.remove_item_from_daily_menu(db, restaurant_id, patch.day, patch.ids)
+    else:  # We are sure this is delete, because of schemas.PatchMenu's validator.
+        crud.delete_items(db, restaurant_id, patch.ids)

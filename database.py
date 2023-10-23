@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Generator
 from sqlite3 import Connection as SqliteConnection
 
@@ -20,7 +19,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def set_sqlite_pragma(
     dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry
 ) -> None:
-    logging.info("FORGG")
     if isinstance(dbapi_connection, SqliteConnection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
@@ -29,8 +27,6 @@ def set_sqlite_pragma(
 
 # Dependency function for db parameter to handler functions.
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with SessionLocal() as session:
+        yield session
+        session.commit()

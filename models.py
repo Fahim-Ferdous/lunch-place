@@ -1,7 +1,6 @@
 import enum
-from typing import Optional
 
-from sqlalchemy import VARCHAR, ForeignKey, Null
+from sqlalchemy import VARCHAR, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -29,7 +28,9 @@ class Item(Base):
     __tablename__ = "items"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(VARCHAR(32), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(
+        VARCHAR(32), unique=True, nullable=False
+    )  # TODO: Uniqueness should be compunded with id.
     price: Mapped[int]
     description: Mapped[str | None] = mapped_column(VARCHAR(255))
 

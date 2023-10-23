@@ -1,4 +1,4 @@
-from sqlalchemy import insert, not_, or_, select
+from sqlalchemy import delete, insert, not_, or_, select
 from sqlalchemy.orm import Session
 
 import auth
@@ -28,7 +28,6 @@ def create_root_user(db: Session) -> None:
             role=models.Roles.ADMIN,
         )
     )
-    db.commit()
 
 
 def is_email_username_registered(
@@ -78,13 +77,18 @@ def get_items(
 ) -> list[models.Item]:
     qry = db.query(models.Item).where(models.Item.restaurant_id == restaurant_id)
     if not all:
-        items_filter = models.Item.id.in_(
+        sieve = (
             db.query(models.AssocItemDailyMenu.item_id)
             .join(models.Item)
             .where(models.Item.restaurant_id == restaurant_id)
         )
-        if day is None:
-            items_filter = not_(items_filter)
+
+        if day is not None:
+            items_filter = models.Item.id.in_(
+                sieve.join(models.DailyMenu).where(models.DailyMenu.day == day)
+            )
+        else:
+            items_filter = models.Item.id.not_in(sieve)
 
         qry = qry.where(items_filter)
     items = qry.all()
@@ -117,20 +121,51 @@ def add_items(
                 ]
             )
         )
-    db.commit()
     return new_items
 
 
-def update_daily_menu(
-    db: Session, restaurant_id: int, daily_menu: schemas.DailyMenuCreate
-) -> models.DailyMenu:
-    r = models.DailyMenu(**daily_menu.model_dump())
-    r.restaurant_id = restaurant_id
+def delete_items(db: Session, restaurant_id: int, ids: list[int]) -> int:
+    return (
+        db.query(models.Item)
+        .where(models.Item.restaurant_id == restaurant_id, models.Item.id.in_(ids))
+        .delete()
+    )
 
-    db.add(r)
-    db.commit()
-    db.refresh(r)
-    return r
+
+def add_item_to_daily_menu(
+    db: Session, restaurant_id: int, day: models.Weekdays, ids: list[int]
+) -> int:
+    return db.execute(
+        insert(models.AssocItemDailyMenu).values(
+            [
+                {
+                    "item_id": i,
+                    "daily_menu_id": select(models.DailyMenu.id).where(
+                        models.DailyMenu.restaurant_id == restaurant_id,
+                        models.DailyMenu.day == day,
+                    ),
+                }
+                for i in ids
+            ]
+        )
+    ).rowcount
+
+
+def remove_item_from_daily_menu(
+    db: Session, restaurant_id: int, day: models.Weekdays, ids: list[int]
+) -> int:
+    return (
+        db.query(models.AssocItemDailyMenu)
+        .where(
+            models.AssocItemDailyMenu.item_id.in_(
+                db.query(models.AssocItemDailyMenu.item_id)
+                .join(models.Item)
+                .where(models.Item.restaurant_id == restaurant_id)
+            )
+        )
+        .where(models.AssocItemDailyMenu.item_id.in_(ids))
+        .delete()
+    )
 
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:

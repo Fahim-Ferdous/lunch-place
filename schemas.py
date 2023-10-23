@@ -1,7 +1,8 @@
+import enum
 from string import ascii_letters, digits
 
-from pydantic import (BaseModel, ConfigDict, EmailStr, Field, ValidationInfo,
-                      field_validator, model_validator)
+from pydantic import (BaseModel, ConfigDict, EmailStr, Field, field_validator,
+                      model_validator)
 
 from models import Roles, Weekdays
 
@@ -20,6 +21,26 @@ class Item(ItemCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+class PatchMenuOp(enum.StrEnum):
+    ADD = enum.auto()  # Add the already existing items to some day's menu.
+    REMOVE = enum.auto()  # Remove from some day's menu, but don't delete.
+    DELETE = enum.auto()  # Delete the items entirely.
+
+
+class PatchMenu(BaseModel):
+    op: PatchMenuOp
+    day: Weekdays | None = None
+    ids: list[int]
+
+    @model_validator(mode="after")
+    def check_day(self) -> "PatchMenu":
+        if self.op != PatchMenuOp.DELETE and self.day is None:
+            raise ValueError("Must include day")
+        elif self.op == PatchMenuOp.DELETE and self.day is not None:
+            raise ValueError("day is redundant for delete")
+        return self
 
 
 class DailyMenuCreate(BaseModel):
@@ -44,7 +65,8 @@ class RestaurantBase(BaseModel):
 class Restaurant(RestaurantBase):
     id: int
 
-    menu: list[DailyMenu] = []
+    items: list[Item] = []
+    daily_menus: list[DailyMenu] = []
 
 
 class RestaurantCreate(RestaurantBase):

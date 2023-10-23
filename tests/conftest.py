@@ -10,6 +10,7 @@ import models
 import schemas
 from auth import create_access_token
 from config import settings
+from crud import create_root_user
 from database import get_db
 from main import app
 from models import Base, Roles, Weekdays
@@ -30,9 +31,10 @@ def db() -> Generator[Session, None, None]:
 def override_get_db() -> Generator[Session, None, None]:
     with TestingSessionLocal() as session:
         yield session
+        session.commit()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def employee_auth_token() -> Generator[str, None, None]:
     yield create_access_token("employee1", Roles.EMPLOYEE).access_token
 
@@ -47,7 +49,7 @@ def admin_auth_token() -> Generator[str, None, None]:
     yield create_access_token(settings.ROOT_USERNAME, Roles.ADMIN).access_token
 
 
-TEST_SQLALCHEMY_DATABASE_URL = "sqlite://"
+TEST_SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(
     TEST_SQLALCHEMY_DATABASE_URL,
@@ -60,7 +62,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 Base.metadata.create_all(bind=engine)
 
 
-def create_dummy_data() -> None:
+def create_dummy_data(
+    sessionmaker: sessionmaker[Session] = TestingSessionLocal,
+) -> None:
     restaurants = [schemas.RestaurantCreate(name="restaurant1")]
 
     users = [
@@ -79,7 +83,9 @@ def create_dummy_data() -> None:
         ),
     ]
 
-    with TestingSessionLocal() as session:
+    with sessionmaker() as session:
+        create_root_user(session)
+
         for r in restaurants:
             empty_menus = [
                 models.DailyMenu(
