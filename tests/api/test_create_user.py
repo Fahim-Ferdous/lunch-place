@@ -27,6 +27,23 @@ def test_create_restaurateur_requires_restaurant(
             "password": "hello123",
             "role": "restaurateur",
             "email": "email3@email.com",
+        },
+        headers={"Authorization": f"Bearer {admin_auth_token}"},
+    )
+
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_create_restaurateur_validates_restaurant(
+    client: TestClient, admin_auth_token: str
+) -> None:
+    r = client.post(
+        "/users",
+        json={
+            "username": "newrestaurateur3",
+            "password": "hello123",
+            "role": "restaurateur",
+            "email": "email4@email.com",
             "restaurant_id": 0xDEAD,
         },
         headers={"Authorization": f"Bearer {admin_auth_token}"},

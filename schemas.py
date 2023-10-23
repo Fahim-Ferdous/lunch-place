@@ -1,20 +1,25 @@
 from string import ascii_letters, digits
 
 from pydantic import (BaseModel, ConfigDict, EmailStr, Field, ValidationInfo,
-                      field_validator)
+                      field_validator, model_validator)
 
 from models import Roles, Weekdays
 
 valid_username_chars = set(ascii_letters + digits + "-_")
 
 
-class Item(BaseModel):
+class ItemCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
     name: str = Field(max_length=32)
     price: int = Field(gt=0, lt=10e5)
     description: str | None = Field(max_length=255)
+
+
+class Item(ItemCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
 
 
 class DailyMenuCreate(BaseModel):
@@ -60,12 +65,11 @@ class UserCreate(UserBase):
     password: str
     restaurant_id: int | None = None
 
-    @field_validator("restaurant_id")
-    @classmethod
-    def validate_restaurant_id(cls, v: int | None, info: ValidationInfo) -> int | None:
-        if info.data["role"] == Roles.RESTAURATEUR and v is None:
+    @model_validator(mode="after")
+    def check_restaurant_id(self) -> "UserCreate":
+        if self.role == Roles.RESTAURATEUR and self.restaurant_id is None:
             raise ValueError("restaurant_id is required for creating restaurateurs")
-        return v
+        return self
 
     @field_validator("username")
     @classmethod
