@@ -78,15 +78,15 @@ def get_items(
 ) -> list[models.Item]:
     qry = db.query(models.Item).where(models.Item.restaurant_id == restaurant_id)
     if not all:
-        condition = models.Item.id.in_(
+        items_filter = models.Item.id.in_(
             db.query(models.AssocItemDailyMenu.item_id)
             .join(models.Item)
             .where(models.Item.restaurant_id == restaurant_id)
         )
         if day is None:
-            condition = not_(condition)
+            items_filter = not_(items_filter)
 
-        qry = qry.where((condition))
+        qry = qry.where(items_filter)
     items = qry.all()
     return items
 

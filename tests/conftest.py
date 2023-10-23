@@ -15,7 +15,7 @@ from main import app
 from models import Base, Roles, Weekdays
 
 
-# This one is for the tests to use.
+# This one is for the crud tests to use.
 @pytest.fixture(scope="function")
 def db() -> Generator[Session, None, None]:
     with TestingSessionLocal() as session:
@@ -26,7 +26,7 @@ def db() -> Generator[Session, None, None]:
     create_dummy_data()
 
 
-# And this one is for the backend to use.
+# And this one is for the backend to use, aka for api tests.
 def override_get_db() -> Generator[Session, None, None]:
     with TestingSessionLocal() as session:
         yield session
