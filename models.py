@@ -34,7 +34,6 @@ class Item(Base):
     description: Mapped[str | None] = mapped_column(VARCHAR(255))
 
     restaurant_id = mapped_column(ForeignKey("restaurants.id"))
-    daily_menu_id = mapped_column(ForeignKey("daily_menus.id"))
 
 
 class DailyMenu(Base):
@@ -45,7 +44,14 @@ class DailyMenu(Base):
     day: Mapped[Weekdays]
 
     restaurant_id = mapped_column(ForeignKey("restaurants.id"))
-    items = relationship(Item)
+    items: Mapped[list["AssocItemDailyMenu"]] = relationship()
+
+
+class AssocItemDailyMenu(Base):
+    __tablename__ = "items_daily_menus"
+
+    item_id = mapped_column(ForeignKey("items.id"), primary_key=True)
+    daily_menu_id = mapped_column(ForeignKey("daily_menus.id"), primary_key=True)
 
 
 class Restaurant(Base):

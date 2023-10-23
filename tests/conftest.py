@@ -15,9 +15,21 @@ from main import app
 from models import Base, Roles, Weekdays
 
 
-@pytest.fixture(scope="session")
+# This one is for the tests to use.
+@pytest.fixture(scope="function")
 def db() -> Generator[Session, None, None]:
-    yield TestingSessionLocal()
+    with TestingSessionLocal() as session:
+        yield session
+        for t in reversed(Base.metadata.sorted_tables):
+            session.execute(t.delete())
+        session.commit()
+    create_dummy_data()
+
+
+# And this one is for the backend to use.
+def override_get_db() -> Generator[Session, None, None]:
+    with TestingSessionLocal() as session:
+        yield session
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +39,7 @@ def employee_auth_token() -> Generator[str, None, None]:
 
 @pytest.fixture(scope="session")
 def restaurateur_auth_token() -> Generator[str, None, None]:
-    yield create_access_token("restaurateur", Roles.RESTAURATEUR).access_token
+    yield create_access_token("restaurateur", Roles.RESTAURATEUR, 1).access_token
 
 
 @pytest.fixture(scope="session")
@@ -67,8 +79,7 @@ def create_dummy_data() -> None:
         ),
     ]
 
-    test_db = TestingSessionLocal()
-    try:
+    with TestingSessionLocal() as session:
         for r in restaurants:
             empty_menus = [
                 models.DailyMenu(
@@ -77,31 +88,25 @@ def create_dummy_data() -> None:
                 for dm in Weekdays
             ]
 
-            test_db.add(
+            session.add(
                 models.Restaurant(**(r.model_dump() | {"daily_menus": empty_menus}))
             )
 
         for u in users:
-            test_db.add(models.User(**u.model_dump()))
+            session.add(models.User(**u.model_dump()))
 
-        test_db.commit()
-    finally:
-        test_db.close()
-
-
-def override_get_db() -> Generator[Session, None, None]:
-    test_db = TestingSessionLocal()
-    try:
-        yield test_db
-    finally:
-        test_db.close()
+        session.commit()
 
 
 app.dependency_overrides[get_db] = override_get_db
-create_dummy_data()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def client() -> Generator[TestClient, None, None]:
+    with TestingSessionLocal() as session:
+        for t in reversed(Base.metadata.sorted_tables):
+            session.execute(t.delete())
+        session.commit()
+    create_dummy_data()
     with TestClient(app) as c:
         yield c

@@ -1,4 +1,4 @@
-from sqlalchemy import or_
+from sqlalchemy import insert, not_, or_, select
 from sqlalchemy.orm import Session
 
 import auth
@@ -64,6 +64,69 @@ def create_restaurant(
     ]
 
     r = models.Restaurant(**(restaurant.model_dump() | {"daily_menus": empty_menus}))
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+def get_items(
+    db: Session,
+    restaurant_id: int,
+    day: models.Weekdays | None,
+    all: bool = False,
+) -> list[models.Item]:
+    qry = db.query(models.Item).where(models.Item.restaurant_id == restaurant_id)
+    if not all:
+        condition = models.Item.id.in_(
+            db.query(models.AssocItemDailyMenu.item_id)
+            .join(models.Item)
+            .where(models.Item.restaurant_id == restaurant_id)
+        )
+        if day is None:
+            condition = not_(condition)
+
+        qry = qry.where((condition))
+    items = qry.all()
+    return items
+
+
+def add_items(
+    db: Session,
+    restaurant_id: int,
+    day: models.Weekdays | None,
+    items: list[schemas.ItemCreate],
+) -> list[models.Item]:
+    new_items = [
+        models.Item(**(i.model_dump() | {"restaurant_id": restaurant_id}))
+        for i in items
+    ]
+    db.bulk_save_objects(new_items, return_defaults=True)
+    if day is not None:
+        db.execute(
+            insert(models.AssocItemDailyMenu).values(
+                [
+                    {
+                        "item_id": i.id,
+                        "daily_menu_id": select(models.DailyMenu.id).where(
+                            models.DailyMenu.restaurant_id == restaurant_id,
+                            models.DailyMenu.day == day,
+                        ),
+                    }
+                    for i in new_items
+                ]
+            )
+        )
+    db.commit()
+    return new_items
+
+
+def update_daily_menu(
+    db: Session, restaurant_id: int, daily_menu: schemas.DailyMenuCreate
+) -> models.DailyMenu:
+    r = models.DailyMenu(**daily_menu.model_dump())
+    r.restaurant_id = restaurant_id
+
     db.add(r)
     db.commit()
     db.refresh(r)

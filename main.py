@@ -57,6 +57,12 @@ employee_only = filter_by_role(models.Roles.EMPLOYEE)
 restaurateur_only = filter_by_role(models.Roles.RESTAURATEUR)
 
 
+def get_role(
+    creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+) -> Generator[models.Roles, None, None]:
+    yield auth.unpack_jwt(creds.credentials).role
+
+
 def get_restaurant_id(
     creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
 ) -> Generator[
@@ -77,7 +83,9 @@ def login_access_token(
             detail="Incorrect username or password",
         )
 
-    return auth.create_access_token(str(user.username), models.Roles(str(user.role)))
+    return auth.create_access_token(
+        str(user.username), models.Roles(str(user.role)), user.restaurant_id
+    )
 
 
 @app.post(
@@ -116,3 +124,38 @@ def create_restaurant(
     restaurant: schemas.RestaurantCreate, db: Session = Depends(get_db)
 ) -> models.Restaurant:
     return crud.create_restaurant(db, restaurant)
+
+
+@app.get(
+    "/menu/",
+    response_model=list[schemas.Item],
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(restaurateur_only)],
+)
+def get_menu(
+    day: models.Weekdays | None = None,
+    restaurant_id: int = Depends(get_restaurant_id),
+    db: Session = Depends(get_db),
+    all: bool = False,
+) -> models.DailyMenu | list[models.Item]:
+    return crud.get_items(db, restaurant_id, day, all)
+
+
+@app.post(
+    "/menu/",
+    response_model=list[schemas.Item],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(restaurateur_only)],
+)
+def add_to_daily_menu(
+    items: list[schemas.ItemCreate],
+    day: models.Weekdays | None = None,
+    restaurant_id: int = Depends(get_restaurant_id),
+    db: Session = Depends(get_db),
+) -> models.DailyMenu | list[models.Item]:
+    return crud.add_items(
+        db,
+        restaurant_id,
+        day,
+        items,
+    )

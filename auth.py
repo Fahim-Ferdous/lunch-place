@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from config import settings
 from models import Roles
@@ -31,7 +31,7 @@ def get_password_hash(password: str) -> str:
 
 
 def encode_jwt(
-    data: dict[str, datetime | str], expires_delta: timedelta | None = None
+    data: dict[str, datetime | str | int | None], expires_delta: timedelta | None = None
 ) -> str:
     to_encode = data.copy()
     if expires_delta:
@@ -45,10 +45,14 @@ def encode_jwt(
     return encoded_jwt
 
 
-def create_access_token(username: str, role: Roles) -> Token:
+def create_access_token(
+    username: str, role: Roles, restaurant_id: int | None = None
+) -> Token:
     access_token_expires = timedelta(seconds=settings.JWT_TTL_SECONDS)
     access_token = encode_jwt(
-        data={"role": role, "sub": username},
+        data=TokenData(
+            username=username, role=role, restaurant_id=restaurant_id
+        ).model_dump(),
         expires_delta=access_token_expires,
     )
 
@@ -65,11 +69,11 @@ def unpack_jwt(token: str) -> TokenData:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        username: str = str(payload.get("sub"))
-        role: Roles = Roles(str(payload.get("role")))
-        if username is None:
+        token_data = TokenData(**payload)
+        try:
+            TokenData.model_validate(token_data)
+        except ValidationError:
             raise invalid_creds_exc
-        token_data = TokenData(username=username, role=role)
     except JWTError:
         raise invalid_creds_exc
 

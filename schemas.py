@@ -13,7 +13,7 @@ class ItemCreate(BaseModel):
 
     name: str = Field(max_length=32)
     price: int = Field(gt=0, lt=10e5)
-    description: str | None = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=255)
 
 
 class Item(ItemCreate):
