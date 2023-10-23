@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -37,16 +37,32 @@ app = FastAPI(lifespan=lifespan)
 security = HTTPBearer()
 
 
-def admin_only(
+def filter_by_role(role: models.Roles) -> Callable[..., None]:
+    def role_only(
+        creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+    ) -> None:
+        d = auth.unpack_jwt(creds.credentials)
+        if d.role != role:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail=f"Only an {role} can use this feature",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    return role_only
+
+
+admin_only = filter_by_role(models.Roles.ADMIN)
+employee_only = filter_by_role(models.Roles.EMPLOYEE)
+restaurateur_only = filter_by_role(models.Roles.RESTAURATEUR)
+
+
+def get_restaurant_id(
     creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
-) -> None:
-    d = auth.unpack_jwt(creds.credentials)
-    if d.role != models.Roles.ADMIN:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            detail="Only an admin can use this feature",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+) -> Generator[
+    int | None, None, None
+]:  # Here, ``None`` in yield type is unnecessary, as we will filter for resturateurs only.
+    yield auth.unpack_jwt(creds.credentials).restaurant_id
 
 
 # TODO: Logout (use a nonce in jwt?)

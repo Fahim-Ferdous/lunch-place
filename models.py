@@ -1,7 +1,7 @@
 import enum
 from typing import Optional
 
-from sqlalchemy import VARCHAR, ForeignKey
+from sqlalchemy import VARCHAR, ForeignKey, Null
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -34,6 +34,18 @@ class Item(Base):
     description: Mapped[str | None] = mapped_column(VARCHAR(255))
 
     restaurant_id = mapped_column(ForeignKey("restaurants.id"))
+    daily_menu_id = mapped_column(ForeignKey("daily_menus.id"))
+
+
+class DailyMenu(Base):
+    __tablename__ = "daily_menus"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    title: Mapped[str | None] = mapped_column(VARCHAR(32))
+    day: Mapped[Weekdays]
+
+    restaurant_id = mapped_column(ForeignKey("restaurants.id"))
+    items = relationship(Item)
 
 
 class Restaurant(Base):
@@ -44,14 +56,7 @@ class Restaurant(Base):
     description: Mapped[str | None] = mapped_column(VARCHAR(255))
 
     items = relationship(Item)
-
-
-class RestaurantMenu(Base):
-    __tablename__ = "restaurant_menus"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    title: Mapped[str | None] = mapped_column(VARCHAR(32))
-    day: Mapped[Weekdays]
+    daily_menus = relationship(DailyMenu)
 
 
 class User(Base):

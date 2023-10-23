@@ -3,9 +3,32 @@ from string import ascii_letters, digits
 from pydantic import (BaseModel, ConfigDict, EmailStr, Field, ValidationInfo,
                       field_validator)
 
-from models import Roles
+from models import Roles, Weekdays
 
 valid_username_chars = set(ascii_letters + digits + "-_")
+
+
+class Item(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str = Field(max_length=32)
+    price: int = Field(gt=0, lt=10e5)
+    description: str | None = Field(max_length=255)
+
+
+class DailyMenuCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str | None = Field(default=None, max_length=32)
+    day: Weekdays
+    items: list[Item]
+
+
+class DailyMenu(DailyMenuCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
 
 
 class RestaurantBase(BaseModel):
@@ -16,18 +39,11 @@ class RestaurantBase(BaseModel):
 class Restaurant(RestaurantBase):
     id: int
 
+    menu: list[DailyMenu] = []
+
 
 class RestaurantCreate(RestaurantBase):
     pass
-
-
-class Item(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str = Field(max_length=32)
-    price: int = Field(gt=0, lt=10e5)
-    description: str | None = Field(max_length=255)
 
 
 class UserBase(BaseModel):

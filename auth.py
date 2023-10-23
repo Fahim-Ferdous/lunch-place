@@ -16,6 +16,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: str
     role: Roles
+    restaurant_id: int | None = None
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

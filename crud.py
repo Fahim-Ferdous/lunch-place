@@ -1,4 +1,4 @@
-from sqlalchemy import or_, text
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import auth
@@ -58,8 +58,12 @@ def get_user(db: Session, username: str) -> models.User | None:
 def create_restaurant(
     db: Session, restaurant: schemas.RestaurantCreate
 ) -> models.Restaurant:
-    r = models.Restaurant(**restaurant.model_dump())
-    db.execute(text("pragma FOREIGN_KEYS=on"))
+    empty_menus = [
+        models.DailyMenu(**(schemas.DailyMenuCreate(day=dm, items=[])).model_dump())
+        for dm in models.Weekdays
+    ]
+
+    r = models.Restaurant(**(restaurant.model_dump() | {"daily_menus": empty_menus}))
     db.add(r)
     db.commit()
     db.refresh(r)
@@ -67,10 +71,9 @@ def create_restaurant(
 
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
-    user_copy = user.model_copy()
-    user_copy.password = auth.get_password_hash(user.password)
+    db_user = models.User(**user.model_dump())
+    db_user.password = auth.get_password_hash(user.password)
 
-    db_user = models.User(**user_copy.model_dump())
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
