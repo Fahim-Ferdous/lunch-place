@@ -52,20 +52,21 @@ jobs:
           cache: 'pip'
       - name: Running mypy
         run: |
-          mypy --strict .
+          python -m mypy --strict .
   test:
     runs-on: ubuntu-latest
     needs: [test-build]
     steps:
+      - uses: actions/download-artifact@master
+        with:
+          name: base
+          path: .
       - name: Setup dev dependencies
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
-      - uses: actions/download-artifact@master
-        with:
-          name: testing
       - name: Testing
         run: |
           cp sample.env .env
-          pytest
+          python -m pytest
