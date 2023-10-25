@@ -2,15 +2,14 @@ from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import Session, close_all_sessions, sessionmaker
 
 import models
 import schemas
 from auth import create_access_token
 from config import get_settings
 from crud import create_root_user
+from database import SessionLocal
 from main import app
 from models import Base, Roles, Weekdays
 
@@ -19,7 +18,7 @@ from models import Base, Roles, Weekdays
 @pytest.fixture(scope="function")
 def db() -> Generator[Session, None, None]:
     create_dummy_data()
-    with TestingSessionLocal() as session:
+    with SessionLocal() as session:
         yield session
 
 
@@ -43,23 +42,14 @@ def employee_auth_token2() -> Generator[str, None, None]:
     yield create_access_token(4, "employee2", Roles.EMPLOYEE).access_token
 
 
-engine = create_engine(
-    get_settings().SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-Base.metadata.create_all(bind=engine)
-
-
 def create_dummy_data(
-    sessionmaker: sessionmaker[Session] = TestingSessionLocal,
+    sessionmaker: sessionmaker[Session] = SessionLocal,
 ) -> None:
     with sessionmaker() as session:
-        for t in reversed(Base.metadata.sorted_tables):
-            session.execute(t.delete())
+        if session.bind is not None:
+            close_all_sessions()
+            Base.metadata.drop_all(session.bind)
+            Base.metadata.create_all(session.bind)
         session.commit()
 
     restaurants = [

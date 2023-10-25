@@ -14,9 +14,7 @@ import crud
 import models
 import schemas
 from config import get_settings
-from database import engine, get_db
-
-models.Base.metadata.create_all(bind=engine)
+from database import get_db
 
 
 @asynccontextmanager
