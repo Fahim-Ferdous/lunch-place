@@ -22,14 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     steps:
+      - uses: actions/download-artifact@master
+        with:
+          name: base
+          path: .
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
-      - uses: actions/download-artifact@master
-        with:
-          name: base
       - name: Install develeopment dependencies
         run: pip install -r requirements-dev.txt
       - uses: actions/upload-artifact@master
@@ -40,14 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-build]
     steps:
+      - uses: actions/download-artifact@master
+        with:
+          name: base
+          path: .
       - name: Setup dev dependencies
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
-      - uses: actions/download-artifact@master
-        with:
-          name: testing
       - name: Running mypy
         run: |
           mypy --strict .
