@@ -16,6 +16,7 @@ jobs:
         run: pip install -r requirements.txt
       - uses: actions/upload-artifact@master
         with:
+          name: base
           path: .
   lint:
     runs-on: ubuntu-latest
@@ -25,9 +26,12 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+      - uses: actions/download-artifact@master
+        with:
+          name: base
       - name: Install pip dependencies
-        run: pip install -r requirements.txt
-      - name: Testing
+        run: pip install -r requirements-dev.txt
+      - name: Running mypy
         run: |
           mypy --strict .
   test:
@@ -38,8 +42,11 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+      - uses: actions/download-artifact@master
+        with:
+          name: base
       - name: Install pip dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       - name: Testing
         run: |
           cp sample.env .env
