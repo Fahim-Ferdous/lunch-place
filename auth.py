@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, ValidationError
 
-from config import settings
+from config import get_settings
 from models import Roles
 
 
@@ -14,6 +14,7 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
+    user_id: int
     username: str
     role: Roles
     restaurant_id: int | None = None
@@ -40,18 +41,18 @@ def encode_jwt(
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+        to_encode, get_settings().JWT_SECRET_KEY, algorithm=get_settings().JWT_ALGORITHM
     )
     return encoded_jwt
 
 
 def create_access_token(
-    username: str, role: Roles, restaurant_id: int | None = None
+    user_id: int, username: str, role: Roles, restaurant_id: int | None = None
 ) -> Token:
-    access_token_expires = timedelta(seconds=settings.JWT_TTL_SECONDS)
+    access_token_expires = timedelta(seconds=get_settings().JWT_TTL_SECONDS)
     access_token = encode_jwt(
         data=TokenData(
-            username=username, role=role, restaurant_id=restaurant_id
+            user_id=user_id, username=username, role=role, restaurant_id=restaurant_id
         ).model_dump(),
         expires_delta=access_token_expires,
     )
@@ -67,7 +68,9 @@ def unpack_jwt(token: str) -> TokenData:
     )
     try:
         payload = jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            token,
+            get_settings().JWT_SECRET_KEY,
+            algorithms=[get_settings().JWT_ALGORITHM],
         )
         token_data = TokenData(**payload)
         try:

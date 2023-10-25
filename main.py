@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -12,22 +13,18 @@ import auth
 import crud
 import models
 import schemas
+from config import get_settings
 from database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Creates root user on startup, if not exists.
-    We need to check if get_db has been overriden, since we will override it during tests.
+    Creates root user on startup.
     """
-    dependency = get_db
-    if get_db in app.dependency_overrides:
-        dependency = app.dependency_overrides[get_db]
-
-    crud.create_root_user(next(dependency()))
+    crud.create_root_user(next(get_db()))
     yield
 
 
@@ -61,6 +58,12 @@ def get_role(
     yield auth.unpack_jwt(creds.credentials).role
 
 
+def get_user_id(
+    creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+) -> Generator[int, None, None]:
+    yield auth.unpack_jwt(creds.credentials).user_id
+
+
 def get_restaurant_id(
     creds: Annotated[HTTPAuthorizationCredentials, Depends(security)]
 ) -> Generator[
@@ -82,7 +85,7 @@ def login_access_token(
         )
 
     return auth.create_access_token(
-        str(user.username), models.Roles(str(user.role)), user.restaurant_id
+        user.id, str(user.username), models.Roles(str(user.role)), user.restaurant_id
     )
 
 
@@ -171,3 +174,45 @@ def patch_menu(
             crud.remove_item_from_daily_menu(db, restaurant_id, patch.day, patch.ids)
     else:  # We are sure this is delete, because of schemas.PatchMenu's validator.
         crud.delete_items(db, restaurant_id, patch.ids)
+
+
+@app.get(
+    "/vote",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(employee_only)],
+)
+def get_votes(
+    employee_id: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> list[schemas.EmployeeVoteHistory]:
+    return [
+        schemas.EmployeeVoteHistory(restaurant=r[0], voted_at=r[1])
+        for r in crud.get_voting_history_of_user(db, employee_id)
+    ]
+
+
+@app.post(
+    "/vote/{restaurant_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(employee_only)],
+)
+def vote(
+    restaurant_id: int,
+    employee_id: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> None:
+    if datetime.now().time() > get_settings().VOTING_ENDS_AT:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Voting time has ended, try again tomorrow."
+        )
+
+    try:
+        crud.vote(db, employee_id, restaurant_id)
+    except IntegrityError as e:
+        if (
+            e.orig is not None
+            and isinstance(e.orig.args[0], str)
+            and e.orig.args[0].lower().count("foreign key")
+        ):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such restaurant.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "You can vote only once per day.")

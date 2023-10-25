@@ -1,4 +1,5 @@
 import enum
+from datetime import date, datetime
 from string import ascii_letters, digits
 
 from pydantic import (BaseModel, ConfigDict, EmailStr, Field, field_validator,
@@ -100,3 +101,10 @@ class UserCreate(UserBase):
             i for i in v if i not in valid_username_chars
         ), "Username can only contain alphanumeric characters, underscores, ands hyphens"
         return v
+
+
+class EmployeeVoteHistory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    voted_at: datetime
+    restaurant: str

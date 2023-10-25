@@ -1,13 +1,13 @@
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from config import settings
+from config import get_settings
 
 
 def test_get_access_token(client: TestClient) -> None:
     login_data = {
-        "username": settings.ROOT_USERNAME,
-        "password": settings.ROOT_PASSWORD,
+        "username": get_settings().ROOT_USERNAME,
+        "password": get_settings().ROOT_PASSWORD,
     }
     r = client.post(f"/login", data=login_data)
     tokens = r.json()
@@ -18,8 +18,8 @@ def test_get_access_token(client: TestClient) -> None:
 
 def test_incorrect_password(client: TestClient) -> None:
     login_data = {
-        "username": settings.ROOT_USERNAME,
-        "password": settings.ROOT_PASSWORD + "garbage",
+        "username": get_settings().ROOT_USERNAME,
+        "password": get_settings().ROOT_PASSWORD + "garbage",
     }
     r = client.post(f"/login", data=login_data)
     err_msg = r.json()

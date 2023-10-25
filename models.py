@@ -1,7 +1,9 @@
 import enum
+from datetime import date, datetime
 
-from sqlalchemy import VARCHAR, ForeignKey
+from sqlalchemy import VARCHAR, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.sql.functions import current_date, now
 
 
 class Base(DeclarativeBase):
@@ -76,3 +78,24 @@ class User(Base):
     role: Mapped[Roles]
 
     restaurant_id = mapped_column(ForeignKey("restaurants.id"))
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id = mapped_column(ForeignKey(User.id), nullable=False)
+    restaurant_id = mapped_column(ForeignKey(Restaurant.id), nullable=False)
+
+    created_date: Mapped[date] = mapped_column(
+        server_default=current_date(), index=True  # type: ignore[no-untyped-call]
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=now())  # type: ignore[no-untyped-call]
+
+    __table_args__ = (UniqueConstraint("user_id", "created_date"),)
+    # TODO: No employee can vote twice.
+    # TODO: After vote ends:
+    # 1. compute winner
+    # 2. archive to separate table
+    # 3. select candidates for the next day (exclude candidate
+    #    they won yesterday and the day before that).

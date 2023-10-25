@@ -7,10 +7,10 @@ from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
-from config import settings
+from config import get_settings
 
 engine = create_engine(
-    settings.SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    get_settings().SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -1,10 +1,14 @@
-from sqlalchemy import delete, insert, not_, or_, select
+from collections.abc import Sequence
+from datetime import datetime
+
+from sqlalchemy import Row, insert, inspect, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.functions import user
 
 import auth
 import models
 import schemas
-from config import settings
+from config import get_settings
 from database import engine
 from models import Base
 
@@ -18,16 +22,17 @@ def create_root_user(db: Session) -> None:
 
     Base.metadata.create_all(engine)
 
-    hashed_password = auth.pwd_context.hash(settings.ROOT_PASSWORD)
+    hashed_password = auth.pwd_context.hash(get_settings().ROOT_PASSWORD)
 
     db.add(
         models.User(
-            username=settings.ROOT_USERNAME,
+            username=get_settings().ROOT_USERNAME,
             password=hashed_password,
-            email=settings.ROOT_EMAIL,
+            email=get_settings().ROOT_EMAIL,
             role=models.Roles.ADMIN,
         )
     )
+    db.commit()
 
 
 def is_email_username_registered(
@@ -176,3 +181,21 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def get_voting_history_of_user(
+    db: Session, user_id: int
+) -> Sequence[Row[tuple[str, datetime]]]:
+    return db.execute(
+        select(models.Restaurant.name, models.Vote.created_at)
+        .join(models.Vote)
+        .where(models.Vote.user_id == user_id)
+    ).all()
+
+
+def vote(db: Session, user_id: int, restaurant_id: int) -> models.Vote:
+    r = models.Vote(user_id=user_id, restaurant_id=restaurant_id)
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r

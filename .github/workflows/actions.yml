@@ -7,7 +7,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install pip dependencies
+        run: pip install -r requirements.txt
+      - uses: actions/upload-artifact@master
+        with:
+          path: .
+  lint:
+    steps:
+      - name: Setup dev dependencies
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install pip dependencies
+        run: pip install -r requirements.txt
+      - name: Testing
+        run: |
+          mypy --strict .
+  test:
+    steps:
+      - name: Setup dev dependencies
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'

@@ -16,7 +16,8 @@ docker run -p 8000:8000 bongo_app:latest
 
 # Testing
 
-To test locally, you can just run `pytest`.
+To test locally, you can just run `pytest`, but you need some more dependencies.
+Run `pip install -r requrements-dev.txt` to install them.
 
 If you want to run the tests inside docker, then run the following,
 
