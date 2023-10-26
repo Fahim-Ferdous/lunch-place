@@ -31,3 +31,5 @@ docker run bongo_app.test:latest
 - Logging
 - Logout
 - Ensure restaurant can't win 3 consecutive days.
+- docker compose
+- dockerize celery worker
