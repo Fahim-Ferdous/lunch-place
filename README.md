@@ -25,3 +25,9 @@ If you want to run the tests inside docker, then run the following,
 docker buildx b -t bongo_app.test -f Dockerfile.test .
 docker run bongo_app.test:latest
 ```
+
+# TODO
+
+- Logging
+- Logout
+- Ensure restaurant can't win 3 consecutive days.
