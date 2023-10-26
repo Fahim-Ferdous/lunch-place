@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import time, timedelta
 from functools import lru_cache
 
 from pydantic import field_validator
@@ -23,12 +23,19 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URL: str = "sqlite:///./db.sqlite3"
 
     VOTING_ENDS_AT: time = time.fromisoformat("12")
+    VOTING_END_TIME_MARGIN: timedelta = timedelta(seconds=10)
 
     @field_validator("VOTING_ENDS_AT", mode="before")
     def parse_time(cls, v: str | time) -> time:
         if isinstance(v, time):
             return v
         return time.fromisoformat(v)
+
+    @field_validator("VOTING_END_TIME_MARGIN", mode="before")
+    def parse_timedelta(cls, v: str | timedelta) -> timedelta:
+        if isinstance(v, timedelta):
+            return v
+        return timedelta(seconds=int(v))
 
 
 @lru_cache

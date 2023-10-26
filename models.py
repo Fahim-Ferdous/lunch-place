@@ -87,15 +87,33 @@ class Vote(Base):
     user_id = mapped_column(ForeignKey(User.id), nullable=False)
     restaurant_id = mapped_column(ForeignKey(Restaurant.id), nullable=False)
 
-    created_date: Mapped[date] = mapped_column(
+    voting_date: Mapped[date] = mapped_column(
         server_default=current_date(), index=True  # type: ignore[no-untyped-call]
     )
     created_at: Mapped[datetime] = mapped_column(server_default=now())  # type: ignore[no-untyped-call]
 
-    __table_args__ = (UniqueConstraint("user_id", "created_date"),)
+    __table_args__ = (UniqueConstraint("user_id", "voting_date"),)
     # TODO: No employee can vote twice.
     # TODO: After vote ends:
     # 1. compute winner
     # 2. archive to separate table
     # 3. select candidates for the next day (exclude candidate
     #    they won yesterday and the day before that).
+
+
+class VoteWinner(Base):
+    __tablename__ = "vote_winners"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    votes: Mapped[int]
+    restaurant_id = mapped_column(ForeignKey(Restaurant.id), nullable=False)
+    restaurant = relationship(Restaurant)
+
+    voting_date: Mapped[date] = mapped_column(
+        server_default=current_date(), index=True  # type: ignore[no-untyped-call]
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=now())  # type: ignore[no-untyped-call]
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "voting_date"),
+    )  # In case celery worker runs twice...

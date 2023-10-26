@@ -20,6 +20,7 @@ test-data/packages/.pip_lock
 *.db
 *.sqlite
 *.sqlite3
+celerybeat-schedule
 
 # Packages
 *.egg

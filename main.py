@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -8,6 +8,7 @@ from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,
                               OAuth2PasswordRequestForm)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.compiler import schema
 
 import auth
 import crud
@@ -121,8 +122,19 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)) -> mode
 )
 def create_restaurant(
     restaurant: schemas.RestaurantCreate, db: Session = Depends(get_db)
-) -> models.Restaurant:
-    return crud.create_restaurant(db, restaurant)
+) -> models.Restaurant | None:
+    try:
+        return crud.create_restaurant(db, restaurant)
+    except IntegrityError as e:
+        if (
+            e.orig is not None
+            and isinstance(e.orig.args[0], str)
+            and e.orig.args[0].lower().count("unique")
+        ):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Restaurant with this name already exists."
+            )
+        raise e
 
 
 @app.get(
@@ -189,6 +201,24 @@ def get_votes(
     ]
 
 
+@app.get(
+    "/vote/winners",
+    status_code=status.HTTP_200_OK,
+    response_model=list[schemas.VoteWinner],
+    dependencies=[Depends(employee_only)],
+)
+def get_winners(
+    of_day: date = datetime.today().date(),
+    db: Session = Depends(get_db),
+) -> list[schemas.VoteWinner]:
+    return [
+        schemas.VoteWinner(
+            votes=i.votes, voting_date=i.voting_date, restaurant=i.restaurant.name
+        )
+        for i in crud.get_winners(db, of_day)
+    ]
+
+
 @app.post(
     "/vote/{restaurant_id}",
     status_code=status.HTTP_202_ACCEPTED,
@@ -199,7 +229,10 @@ def vote(
     employee_id: int = Depends(get_user_id),
     db: Session = Depends(get_db),
 ) -> None:
-    if datetime.now().time() > get_settings().VOTING_ENDS_AT:
+    if (
+        datetime.now()
+        + get_settings().VOTING_END_TIME_MARGIN  # Stop voting a few seconds early
+    ).time() > get_settings().VOTING_ENDS_AT:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Voting time has ended, try again tomorrow."
         )
@@ -207,10 +240,13 @@ def vote(
     try:
         crud.vote(db, employee_id, restaurant_id)
     except IntegrityError as e:
-        if (
-            e.orig is not None
-            and isinstance(e.orig.args[0], str)
-            and e.orig.args[0].lower().count("foreign key")
-        ):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such restaurant.")
-        raise HTTPException(status.HTTP_409_CONFLICT, "You can vote only once per day.")
+        if e.orig is not None and isinstance(e.orig.args[0], str):
+            err = e.orig.args[0].lower()
+            if err.count("foreign key"):
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "No such restaurant.")
+            elif err.count("unique"):
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT, "You can vote only once per day."
+                )
+            else:
+                raise e

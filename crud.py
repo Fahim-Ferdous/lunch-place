@@ -1,26 +1,26 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Row, insert, inspect, or_, select
-from sqlalchemy.orm import Session
-from sqlalchemy.sql.functions import user
+from sqlalchemy import Row, desc, insert, inspect, or_, select, text
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql.functions import count, user
 
 import auth
 import models
 import schemas
 from config import get_settings
-from database import engine
+from database import SessionLocal, engine
 from models import Base
 
 
 def create_root_user(db: Session) -> None:
     """
-    Should run on startup. Check if there is at least one admin. If not, create one.
+    Should run on startup. Create all tables and check if there is at least one admin. If not, create one.
     """
+    Base.metadata.create_all(engine)
+
     if db.query(models.User).filter(models.User.role == models.Roles.ADMIN).count() > 0:
         return
-
-    Base.metadata.create_all(engine)
 
     hashed_password = auth.pwd_context.hash(get_settings().ROOT_PASSWORD)
 
@@ -199,3 +199,51 @@ def vote(db: Session, user_id: int, restaurant_id: int) -> models.Vote:
     db.commit()
     db.refresh(r)
     return r
+
+
+def _compute_winner(db: Session, of_date: date) -> list[tuple[int, int]]:
+    votes_desc_cte = (
+        db.query(
+            models.Vote.restaurant_id.label("restaurant_id"),
+            count(models.Vote.restaurant_id).label(  # type:ignore[no-untyped-call]
+                "n"
+            ),
+        )
+        .where(models.Vote.voting_date == of_date)
+        .group_by(models.Vote.restaurant_id)
+        .order_by(desc(text("n")))
+        .cte("votes_desc")
+    )
+    winners = (
+        db.query(votes_desc_cte)
+        .where(votes_desc_cte.c["n"].in_(db.query(votes_desc_cte.c["n"]).limit(1)))
+        .all()
+    )
+    db.bulk_save_objects(
+        [
+            models.VoteWinner(restaurant_id=restaurant_id, votes=count)
+            for restaurant_id, count in winners
+        ]
+    )
+    db.commit()
+    return winners
+
+
+def compute_winner(
+    session: sessionmaker[Session] | Session = SessionLocal,
+    of_date: date = datetime.now().date(),
+) -> list[tuple[int, int]]:
+    if isinstance(session, Session):
+        return _compute_winner(session, of_date)
+    with session() as db:
+        return _compute_winner(db, of_date)
+
+
+def get_winners(
+    db: Session, voting_day: date = datetime.today().date()
+) -> list[models.VoteWinner]:
+    return (
+        db.query(models.VoteWinner)
+        .where(models.VoteWinner.voting_date == voting_day)
+        .all()
+    )

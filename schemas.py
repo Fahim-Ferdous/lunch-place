@@ -108,3 +108,11 @@ class EmployeeVoteHistory(BaseModel):
 
     voted_at: datetime
     restaurant: str
+
+
+class VoteWinner(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    voting_date: date
+    restaurant: str
+    votes: int
