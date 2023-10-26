@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 from datetime import date, datetime
 
-from sqlalchemy import Row, desc, insert, inspect, or_, select, text
+from sqlalchemy import Row, desc, insert, or_, select, text
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.sql.functions import count, user
+from sqlalchemy.sql.functions import count
 
 import auth
 import models
@@ -103,7 +103,7 @@ def get_items(
 def add_items(
     db: Session,
     restaurant_id: int,
-    day: models.Weekdays | None,
+    days: list[models.Weekdays] | None,
     items: list[schemas.ItemCreate],
 ) -> list[models.Item]:
     new_items = [
@@ -111,7 +111,7 @@ def add_items(
         for i in items
     ]
     db.bulk_save_objects(new_items, return_defaults=True)
-    if day is not None:
+    if days:
         db.execute(
             insert(models.AssocItemDailyMenu).values(
                 [
@@ -123,13 +123,18 @@ def add_items(
                         ),
                     }
                     for i in new_items
+                    for day in days
                 ]
             )
         )
+    db.commit()
     return new_items
 
 
 def delete_items(db: Session, restaurant_id: int, ids: list[int]) -> int:
+    db.query(models.AssocItemDailyMenu).where(
+        models.AssocItemDailyMenu.item_id.in_(ids)
+    ).delete()
     return (
         db.query(models.Item)
         .where(models.Item.restaurant_id == restaurant_id, models.Item.id.in_(ids))
@@ -138,7 +143,7 @@ def delete_items(db: Session, restaurant_id: int, ids: list[int]) -> int:
 
 
 def add_item_to_daily_menu(
-    db: Session, restaurant_id: int, day: models.Weekdays, ids: list[int]
+    db: Session, restaurant_id: int, days: list[models.Weekdays], ids: list[int]
 ) -> int:
     return db.execute(
         insert(models.AssocItemDailyMenu).values(
@@ -151,13 +156,14 @@ def add_item_to_daily_menu(
                     ),
                 }
                 for i in ids
+                for day in days
             ]
         )
     ).rowcount
 
 
 def remove_item_from_daily_menu(
-    db: Session, restaurant_id: int, day: models.Weekdays, ids: list[int]
+    db: Session, restaurant_id: int, days: list[models.Weekdays], ids: list[int]
 ) -> int:
     return (
         db.query(models.AssocItemDailyMenu)
@@ -165,10 +171,17 @@ def remove_item_from_daily_menu(
             models.AssocItemDailyMenu.item_id.in_(
                 db.query(models.AssocItemDailyMenu.item_id)
                 .join(models.Item)
+                .where(models.AssocItemDailyMenu.item_id.in_(ids))
                 .where(models.Item.restaurant_id == restaurant_id)
             )
         )
-        .where(models.AssocItemDailyMenu.item_id.in_(ids))
+        .where(
+            models.AssocItemDailyMenu.daily_menu_id.in_(
+                db.query(models.AssocItemDailyMenu.daily_menu_id)
+                .join(models.DailyMenu)
+                .where(models.DailyMenu.day.in_(days)),
+            )
+        )
         .delete()
     )
 

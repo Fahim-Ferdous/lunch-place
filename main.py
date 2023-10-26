@@ -8,7 +8,6 @@ from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,
                               OAuth2PasswordRequestForm)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.compiler import schema
 
 import auth
 import crud
@@ -159,12 +158,11 @@ def get_menu(
     dependencies=[Depends(restaurateur_only)],
 )
 def add_menu(
-    items: list[schemas.ItemCreate],
-    day: models.Weekdays | None = None,
+    bulk: schemas.ItemsCreateBulk,
     restaurant_id: int = Depends(get_restaurant_id),
     db: Session = Depends(get_db),
 ) -> models.DailyMenu | list[models.Item]:
-    return crud.add_items(db, restaurant_id, day, items)
+    return crud.add_items(db, restaurant_id, bulk.days, bulk.items)
 
 
 @app.patch(
@@ -177,11 +175,11 @@ def patch_menu(
     restaurant_id: int = Depends(get_restaurant_id),
     db: Session = Depends(get_db),
 ) -> None:
-    if patch.day is not None:
+    if patch.days is not None:
         if patch.op == schemas.PatchMenuOp.ADD:
-            crud.add_item_to_daily_menu(db, restaurant_id, patch.day, patch.ids)
+            crud.add_item_to_daily_menu(db, restaurant_id, patch.days, patch.ids)
         elif patch.op == schemas.PatchMenuOp.REMOVE:
-            crud.remove_item_from_daily_menu(db, restaurant_id, patch.day, patch.ids)
+            crud.remove_item_from_daily_menu(db, restaurant_id, patch.days, patch.ids)
     else:  # We are sure this is delete, because of schemas.PatchMenu's validator.
         crud.delete_items(db, restaurant_id, patch.ids)
 

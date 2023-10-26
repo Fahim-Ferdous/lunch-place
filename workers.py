@@ -1,7 +1,5 @@
-from datetime import datetime
-
 from celery import Celery
-from celery.schedules import crontab, schedule
+from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from sqlalchemy.exc import IntegrityError
 

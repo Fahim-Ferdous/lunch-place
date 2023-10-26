@@ -1,11 +1,8 @@
-import random
-from collections import Counter
-
 from sqlalchemy.orm import Session
 
 from crud import (compute_winner, create_restaurant, create_user, get_winners,
                   vote)
-from models import Restaurant, Roles, User, Vote, VoteWinner
+from models import Restaurant, Roles, User
 from schemas import RestaurantCreate, UserCreate
 
 

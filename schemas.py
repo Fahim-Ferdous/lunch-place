@@ -18,6 +18,12 @@ class ItemCreate(BaseModel):
     description: str | None = Field(default=None, max_length=255)
 
 
+class ItemsCreateBulk(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    items: list[ItemCreate]
+    days: list[Weekdays] | None = None
+
+
 class Item(ItemCreate):
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,14 +38,14 @@ class PatchMenuOp(enum.StrEnum):
 
 class PatchMenu(BaseModel):
     op: PatchMenuOp
-    day: Weekdays | None = None
+    days: list[Weekdays] | None = None
     ids: list[int]
 
     @model_validator(mode="after")
     def check_day(self) -> "PatchMenu":
-        if self.op != PatchMenuOp.DELETE and self.day is None:
-            raise ValueError("Must include day")
-        elif self.op == PatchMenuOp.DELETE and self.day is not None:
+        if self.op != PatchMenuOp.DELETE and not self.days:
+            raise ValueError("Must include at least one day")
+        elif self.op == PatchMenuOp.DELETE and self.days:
             raise ValueError("day is redundant for delete")
         return self
 
